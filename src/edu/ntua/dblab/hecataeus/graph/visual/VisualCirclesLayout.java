@@ -55,5 +55,4 @@ public class VisualCirclesLayout extends VisualConcentricCircleLayout{
 		}
 		
 	}
-	
 }

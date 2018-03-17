@@ -9,8 +9,8 @@ import java.util.Iterator;
 import java.util.List;
 
 public class VisualFileColor {
-	protected static List<String> files;
-	protected static HashMap<String, Color> FileColor;
+	private static List<String> files;
+	private static HashMap<String, Color> FileColor;
 	private static List<colorDepth> fName;
 	
 	public VisualFileColor(){
@@ -103,11 +103,9 @@ public class VisualFileColor {
 		{
 			color+=4;
 			color+=2*128;
-			//color+=4*128*128;
 		}
 		c=new Color(color%16777215);
 		return(c);
-//		return(c.brighter());
 	}
 	
 	private Color getColor(int c){

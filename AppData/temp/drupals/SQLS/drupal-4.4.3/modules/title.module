@@ -1,0 +1,2 @@
+SELECT ov.* FROM ourView ov WHERE ov.title = '%s' AND ov.status = 1 ORDER BY ov.created DESC;
+SELECT ov.* FROM ourView ov WHERE ov.title = '%%%s%%' AND ov.status = 1 ORDER BY ov.created DESC;

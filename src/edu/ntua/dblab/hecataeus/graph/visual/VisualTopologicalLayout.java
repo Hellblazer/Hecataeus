@@ -10,8 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.sun.scenario.effect.Offset;
-
 import edu.ntua.dblab.hecataeus.graph.evolution.EdgeType;
 import edu.ntua.dblab.hecataeus.graph.evolution.NodeCategory;
 import edu.ntua.dblab.hecataeus.graph.evolution.NodeType;
@@ -20,15 +18,10 @@ import edu.uci.ics.jung.graph.Graph;
 
 public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdge>{
 
-	public static int cntQuery = 100;
-	public static int cntRelation = 100;
-	public static int cntView = 100;
-	public static int cnt4 = 0;
-	public static int cnt5 = 0;
 	private Point2D.Double OFFSET = new Point2D.Double();
 	private Orientation orientation;
-	VisualGraph graph;
-	double maxYForInputSchemata;
+	private VisualGraph graph;
+	private double maxYForInputSchemata;
 
 	public enum Orientation{
 		RIGHT2LEFT,
@@ -98,7 +91,6 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
     		initializeUpBottom();
     		break;
     	case ZoomedLayoutForModules:
-    		init();
     		ZoomedLayoutForModules();
     		break;
     	default:
@@ -106,12 +98,6 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
     	}
     }
 
-    private void init(){
-    	cntView = 100;
-    	cntQuery = 100;
-    	cntRelation = 100;
-    }
-    
 	public void reset() {
 		this.initialize();
 	}
@@ -432,7 +418,6 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 		List<VisualNode> schemata = new ArrayList<VisualNode>();
 		Map<VisualNode, Point2D> schemataPositions = new HashMap<VisualNode, Point2D>();
 		Point2D.Double lastOfOutput = new Point2D.Double(0,0);
-		VisualNode mn=null;
 		VisualNode vn = null;
 		for(VisualNode v:vns)
 		{
@@ -451,6 +436,7 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 			if(vn.getOutEdges().get(i).getToNode().getType()==NodeType.NODE_TYPE_OUTPUT && vns.contains(vn.getOutEdges().get(i).getToNode()))
 			{
 				schemata.add(vn.getOutEdges().get(i).getToNode());
+				break;
 			}
 		}
 		for(int i=0;i<vn.getOutEdges().size();i++)
@@ -458,6 +444,7 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 			if(vn.getOutEdges().get(i).getToNode().getType()==NodeType.NODE_TYPE_SEMANTICS && vns.contains(vn.getOutEdges().get(i).getToNode()))
 			{
 				schemata.add(vn.getOutEdges().get(i).getToNode());
+				break;
 			}
 		}
 		for(int i=0;i<vn.getOutEdges().size();i++)
@@ -546,14 +533,26 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 							VisualNode outputValueNode=e.getToNode();
 							for(VisualEdge eo : outputValueNode.getOutEdges())
 							{
-								VisualNode inNd=eo.getToNode();
-								if(inNd.getType()==NodeType.NODE_TYPE_ATTRIBUTE)
-								{	// Attribute
-									VisualNode inpNode=paterasKombos(inNd);
-									Point2D inloc=inpNode.getLocation();
-									inloc.setLocation(inloc.getX(),outloc.getY());
-									super.setLocation(inNd, inloc);
-									inNd.setLocation(inloc);
+								if(eo.getType().equals(EdgeType.EDGE_TYPE_MAPPING))
+								{
+									VisualNode inNd=eo.getToNode();
+									for(VisualNode inputSchema : schemata)
+									{
+										if(inputSchema.getType().equals(NodeType.NODE_TYPE_INPUT))
+										{
+											for(VisualEdge inputSchemaToInputAttribute: inputSchema.getOutEdges())
+											{
+												if(inputSchemaToInputAttribute.getToNode().equals(inNd))
+												{	// found parent schema node
+													Point2D inloc=e.getToNode().getLocation();
+													inloc.setLocation(inputSchema.getLocation().getX(), e.getToNode().getLocation().getY());
+													super.setLocation(inNd, inloc);
+													inNd.setLocation(inloc);
+												}
+											}
+										}
+									}
+									
 								}
 								else
 								{	// Aggregate function?
@@ -609,7 +608,14 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 							{
 								VisualNode inpNode=paterasKombos(ve.getToNode());
 								Point2D inloc=inpNode.getLocation();
-								inloc.setLocation(inloc.getX(),lastOfOutput.getY()+OFFSET.getY());
+								if(lastOfOutput.equals(new Point2D.Double(0,0))==false)
+								{
+									inloc.setLocation(inloc.getX(),lastOfOutput.getY()+OFFSET.getY());
+								}
+								else
+								{
+									inloc.setLocation(inloc.getX(),inloc.getY()+OFFSET.getY());
+								}
 								super.setLocation(ve.getToNode(), inloc);
 								ve.getToNode().setLocation(inloc);
 								lastOfOutput.setLocation(inloc);
@@ -671,7 +677,7 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 		Point2D location = new Point2D.Double(initialPosition.getX(), initialPosition.getY());
 		List<VisualNode> nodes = new ArrayList<VisualNode>(this.graph.getVertices());
 		int attrnum=0;
-		int modnum=1;
+		int modnum=0;
 		for(VisualNode n : nodes)
 		{
 			if(n.getType()==NodeType.NODE_TYPE_ATTRIBUTE)
@@ -687,6 +693,11 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 		{
 			attrnum++;
 		}
+		if(modnum==0)
+		{
+			modnum++;
+		}
+		
 		OFFSET.setLocation(new Point2D.Double(size.width/modnum,size.height/attrnum));
 		nodes.sort(new CustomComparator());
 		for(int i=0;i<nodes.size();i++)
@@ -695,13 +706,13 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 			{
 				if(nodes.get(i).getType()==NodeType.NODE_TYPE_RELATION)
 				{	// this will be the last one to be drawn.
-					location.setLocation(maxYForInputSchemata*2+OFFSET.getX(), initialPosition.getY());
+					location.setLocation(2.3*(maxYForInputSchemata+OFFSET.getX()), initialPosition.getY());
 					relationSetLocation(graph.getModule(nodes.get(i)), location);
 				}
 				else
 				{
 					qvZoomedLayoutForModules(graph.getModule(nodes.get(i)), location);
-					location.setLocation(initialPosition.getX(), location.getY()+OFFSET.getY()*2);
+					location.setLocation(initialPosition.getX(), location.getY()+OFFSET.getY()*3);
 				}
 			}
 		}
@@ -764,127 +775,5 @@ public class VisualTopologicalLayout extends AbstractLayout<VisualNode,VisualEdg
 			location.setLocation(initialPosition.getX(), location.getY()+ OFFSET.getY());
 		}
 	}
-	
-	/***
-	 * initialize the locations of nodes 
-	 * according to the topological sort layout, starting from inner circle
-	 * towards outer circles on the screen
-	 */
-	private void initializeCircleOut(){
-		Point2D initialLocation = new Point2D.Double(this.getSize().getWidth(),this.getSize().getHeight());		// @param initialPosition = the start location of the graph
-		Point2D location = new Point2D.Double(initialLocation.getX(), initialLocation.getY());		// @param location = the current location of the graph
-		//use a list to add/remove nodes from the graph for layout reasons
-		List<VisualNode> nodes = new ArrayList<VisualNode>(this.graph.getVertices());
-		//use a temporary HashMap to hold the outEdges for each node , in order to remove them according to the topological algo
-		Map<VisualNode, List<VisualEdge>> outEdges= new HashMap<VisualNode,List<VisualEdge>>();
-		for (VisualNode v: nodes) 
-			outEdges.put(v, new ArrayList<VisualEdge>(this.graph.getOutEdges(v)));
-		while (nodes.size()>0) {
-			//hold the current group
-			List<VisualNode> visualizedGroup = new ArrayList<VisualNode>();
-			//create each group from all vertices with no outgoing edges
-			//create each group from all vertices with no outgoing edges
-			for (VisualNode v: nodes) {
-				if (outEdges.get(v).size()==0) {
-					visualizedGroup.add(v);
-				}
-			}
-			//Initialize the offset according to the number of vertices in current group
-			OFFSET.setLocation(new Point2D.Double(-Math.max(this.getSize().width/visualizedGroup.size(),60),-this.getSize().height/2));
-			//visualize the current group
-			while (!visualizedGroup.isEmpty()) {
-				//get each vertex in group
-				VisualNode v = visualizedGroup.get(0);
-				// remove in edges
-				for(VisualEdge e: this.graph.getInEdges(v)){
-					outEdges.get(e.getFromNode()).remove(e);
-				}
-				//remove each visualized node
-				visualizedGroup.remove(v);
-				nodes.remove(v);
-				// set the location of the current vertex
-				super.setLocation(v,location);
-	    		//set the location of the next vertex in the group that is visualized
-				location.setLocation(location.getX()+ OFFSET.getX(), location.getY());
-			}
-			//set the location of the next group that is visualized
-			location.setLocation(initialLocation.getX(), location.getY()+ OFFSET.getY());
-		}
-	}
-// 	/**
-//	*  
-//	*  
-//	**/
-//	protected void initializeLocations(){
-//		
-//		/*
-//		 * @param initialPosition = the start location of the graph
-//		 */
-//		Point2D initialPosition = new Point2D.Double(this.getSize().getWidth(),0);
-//				
-//		/*
-//		 * @param relationOFFSET = offset from the last vertex of the relation tree
-//		 */
-//		int countRelations = graph.getVertices(NodeType.NODE_TYPE_RELATION).size();
-//		//define offset y as at least 60 pixels 
-//		OFFSET.setLocation(new Point2D.Double(-this.getSize().width/2,Math.max(this.getSize().getHeight()/countRelations,60)));
-//
-//		//holds the nodes that have been located, they must be drawn once
-//		List<VisualNode> nodesLocated = new ArrayList<VisualNode>();
-//		for (VisualNode relationNode: graph.getVertices(NodeType.NODE_TYPE_RELATION)) {
-//				//draw the relation tree
-//				initialPosition = this.drawTree(relationNode,initialPosition, nodesLocated);
-//				//set the location of the next relation
-//				initialPosition.setLocation(initialPosition.getX(), initialPosition.getY()+OFFSET.getY());
-//		}
-//	}
-//	
-//	/**
-//	*   For each relation draws the whole tree JungGraph 
-//	 * @param startLocation
-//	**/
-//	private Point2D drawTree(VisualNode curNode, Point2D startLocation, List<VisualNode> nodesLocated){
-//
-//		/*
-//		 * holds the location of the first child in the parent node's subgraph
-//		 */
-//		Point2D firstChildLocation = new Point2D.Double(startLocation.getX()+OFFSET.getX(),startLocation.getY());
-//		
-//		/*
-//		 * holds the location of the last child in the parent node's subgraph
-//		 */
-//		Point2D lastChildLocation = new Point2D.Double(startLocation.getX()+OFFSET.getX(),startLocation.getY());
-//		/*
-//		 * holds the location of the current child drawn
-//		 */
-//		Point2D curChildLocation = new Point2D.Double(startLocation.getX()+OFFSET.getX(),startLocation.getY());				
-//		
-//		//holds the number of children visualized
-//		int k=0;
-//		//get each query, view dependent on the relation
-//		for(VisualEdge edge: graph.getInEdges(curNode)){
-//			if (edge.getType()==EdgeType.EDGE_TYPE_FROM){
-//				VisualNode dependentNode = graph.getSource(edge);
-//				//if it has not been located
-////				if (!nodesLocated.contains(dependentNode)){
-//					k++;
-//					//draw its graph
-//					curChildLocation = this.drawTree(dependentNode, curChildLocation, nodesLocated);
-//					if (k==1)
-//						firstChildLocation.setLocation(curChildLocation.getX(),curChildLocation.getY());
-//					//set the current child node location
-//					lastChildLocation.setLocation(curChildLocation.getX(),curChildLocation.getY());
-//					//reset the location of the next child node, hold the same x for all child node in the same level
-//					curChildLocation.setLocation(curChildLocation.getX(), curChildLocation.getY()+OFFSET.getY());
-////				}
-//			}
-//		}
-//		
-//		//set relation node location
-//		curNode.setLocation(Math.min(startLocation.getX(),curNode.getLocation().getX()),(firstChildLocation.getY()+lastChildLocation.getY())/2);
-//		nodesLocated.add(curNode);
-//		//return the location of the node
-//		return new Point2D.Double(curNode.getLocation().getX(),curNode.getLocation().getY());
-//	}
 
 }

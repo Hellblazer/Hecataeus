@@ -1,0 +1,1 @@
+SELECT v.* FROM ourView v WHERE v.uid = 0 ORDER BY v.nid DESC; -- LIMIT ;

@@ -5,7 +5,6 @@
 package edu.ntua.dblab.hecataeus.graph.visual;
 
 import java.awt.Color;
-import java.awt.GradientPaint;
 import java.awt.Paint;
 
 import org.apache.commons.collections15.Transformer;
@@ -19,10 +18,8 @@ import edu.uci.ics.jung.visualization.picking.PickedInfo;
  */
 public final class VisualNodeColor implements Transformer<VisualNode, Paint>
 {
-    protected PickedInfo<VisualNode> picked;
+	private PickedInfo<VisualNode> picked;
     
-    protected final static float dark_value = 0.8f;
-    protected final static float light_value = 0.2f;
     public VisualNodeColor(PickedInfo<VisualNode> pi)
     {
         this.picked = pi;
@@ -30,7 +27,6 @@ public final class VisualNodeColor implements Transformer<VisualNode, Paint>
    
     public Paint transform(VisualNode v)
     {
-    	float alpha = 0.7f;
     	if (picked.isPicked(v))
         {
         	return new Color (64,224,208);
@@ -120,8 +116,8 @@ public final class VisualNodeColor implements Transformer<VisualNode, Paint>
 						return Color.ORANGE;
 					else if (type==NodeType.NODE_TYPE_SEMANTICS)
 						return Color.MAGENTA;
-					else if(type == NodeType.NODE_TYPE_CLUSTER)
-						return new Color(0.3f,0.9f,0.6f, alpha); //67,205,128
+					/*else if(type == NodeType.NODE_TYPE_CLUSTER)
+						return new Color(0.3f,0.9f,0.6f, alpha); //67,205,128*/
                 	else return Color.WHITE;
                 }
         	}

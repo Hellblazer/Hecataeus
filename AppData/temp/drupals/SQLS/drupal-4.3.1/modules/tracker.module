@@ -1,0 +1,6 @@
+SELECT ov.nid, ov.title, ov.type, ov.changed, ov.uid, ov.name, MAX(ov.changed), MAX(c.timestamp) AS last_activity FROM ourView ov LEFT JOIN comments c ON ov.nid = c.nid WHERE ov.uid = 0 AND ov.status = 1 GROUP BY ov.nid, ov.title, ov.type, ov.changed, ov.uid, ov.name;
+SELECT COUNT(nid) FROM node WHERE status = 1 AND uid = 0;
+SELECT ov.nid, ov.title, ov.type, ov.changed, ov.uid, ov.name, MAX(ov.changed), MAX(c.timestamp) AS last_activity FROM ourView ov LEFT JOIN comments c ON ov.nid = c.nid WHERE ov.status = 1 GROUP BY ov.nid, ov.title, ov.type, ov.changed, ov.uid, ov.name;
+SELECT COUNT(nid) FROM node WHERE status = 1;
+SELECT c.*, u.name FROM comments c INNER JOIN users u ON c.uid = u.uid WHERE c.uid = 0 AND c.nid = 0 AND c.status = 0 ORDER BY c.cid DESC;
+SELECT c.*, u.name FROM comments c INNER JOIN users u ON c.uid = u.uid WHERE c.nid = 0 AND c.status = 0 ORDER BY c.cid DESC;

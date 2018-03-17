@@ -5,11 +5,10 @@ import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
-import edu.ntua.dblab.hecataeus.HecataeusViewer;
 import edu.ntua.dblab.hecataeus.graph.evolution.NodeType;
+import edu.ntua.dblab.hecataeus.gui.HecataeusViewer;
 import edu.uci.ics.jung.algorithms.layout.AbstractLayout;
 import edu.uci.ics.jung.graph.Graph;
 /**
@@ -28,8 +27,6 @@ public class VisualConcentricCircleLayout extends AbstractLayout<VisualNode,Visu
 	private double width;
 	private double height;
 	
-	private Graph graph;
-	
 	private List<VisualNode> queries = new ArrayList<VisualNode>();
 	private List<VisualNode> relations = new ArrayList<VisualNode>();
 	private List<VisualNode> views = new ArrayList<VisualNode>();
@@ -38,12 +35,11 @@ public class VisualConcentricCircleLayout extends AbstractLayout<VisualNode,Visu
 	
 	/**
 	 * Creates an instance for the specified graph.
-	 * gets querries, views, relations from graph
+	 * Gets querries, views, relations from graph
 	 */
 	@SuppressWarnings("unchecked")
 	public VisualConcentricCircleLayout(Graph g) {
 		super(g);
-		this.graph = g;
 		nodes = new ArrayList<VisualNode>((Collection<? extends VisualNode>) g.getVertices());
 	//	scorer();
 		for(VisualNode v : nodes){
@@ -62,78 +58,6 @@ public class VisualConcentricCircleLayout extends AbstractLayout<VisualNode,Visu
 		}
 	}
 
-	/**
-	 * Returns the radius of the relation circle.
-	 */
-	public double getRelationRadius() {
-		return relationRadius;
-	}
-
-	/**
-	 * Returns the radius of the view circle.
-	 */
-	public double getViewRadius() {
-		return viewRadius;
-	}
-	/**
-	 * Returns the radius of the query circle.
-	 */
-	public double getQueryRadius() {
-		return queryRadius;
-	}
-
-	/**
-	 * 
-	 * @param comparator
-	 * can be used to sort each type of nodes in some way
-	 * not implemeted here
-	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void setRelationVertexOrder(Comparator<VisualNode> comparator){
-		if (relations == null){
-			for(VisualNode v : nodes){
-				if(v.getType() == NodeType.NODE_TYPE_RELATION)
-					relations.add(v);
-			}
-		}
-		Collections.sort((List)relations, comparator);
-	}
-	
-	/**
-	 * 
-	 * @param comparator
-	 * can be used to sort each type of nodes in some way
-	 * not implemeted here
-	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void setViewVertexOrder(Comparator<VisualNode> comparator){
-		if (views == null){
-			for(VisualNode v : nodes){
-				if(v.getType() == NodeType.NODE_TYPE_VIEW)
-					views.add(v);
-			}
-		}
-		Collections.sort((List)views, comparator);
-	}
-	
-	/**
-	 * 
-	 * @param comparator
-	 * can be used to sort each type of nodes in some way
-	 * not implemeted here
-	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void setQueryVertexOrder(Comparator<VisualNode> comparator){
-		if (queries == null){
-			for(VisualNode v : nodes){
-				if(v.getType() == NodeType.NODE_TYPE_QUERY)
-					queries.add(v);
-			}
-		}
-		Collections.sort((List)queries, comparator);
-	}
-	
-	
 	public void reset() {
 		initialize();
 	}
@@ -152,13 +76,7 @@ public class VisualConcentricCircleLayout extends AbstractLayout<VisualNode,Visu
 
 			Collections.sort(sizes);
 			
-			/**
-			 * 
-			 * calculate every radius for each node type
-			 * 
-			 */
-			
-			double tempRad = 0;
+			/* calculate every radius for each node type */
 			if (relationRadius <= 0) {
 
 				if(relations.size() == sizes.get(0)){           // ta relations einai ta ligotera
@@ -202,14 +120,10 @@ public class VisualConcentricCircleLayout extends AbstractLayout<VisualNode,Visu
 	}
 	
 	/**
-	 * 
 	 * @param nodes
 	 * @param radius
 	 * calulate postions on a cicle for each node
-	 * 
 	 */
-	
-	
 	
 	protected void drawCircles(List<VisualNode> nodes, double radius){
 		int cnt = 0;
@@ -258,7 +172,7 @@ public class VisualConcentricCircleLayout extends AbstractLayout<VisualNode,Visu
 	
 	protected ArrayList<VisualNode> FindSem(VisualNode node){
 		ArrayList<VisualNode> sem = new ArrayList<VisualNode>();
-		List<VisualEdge> outE = new ArrayList<VisualEdge>(node._outEdges);
+		List<VisualEdge> outE = new ArrayList<VisualEdge>(node.getOutEdges());
 
 		for(VisualEdge edgeIndx : outE){
 			if(edgeIndx.getToNode()!=null){

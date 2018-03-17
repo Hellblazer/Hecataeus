@@ -1,0 +1,2 @@
+SELECT ov.nid, ov.title, r.body, r.format, ov.comment, ov.created, ov.name FROM ourView ov, node_revisions r WHERE ov.vid = r.vid AND ov.type = '%s' AND ov.uid = 0 ORDER BY ov.created DESC;
+SELECT ov.nid, ov.title, ov.created, ov.name FROM ourView ov WHERE ov.type = '%s' AND ov.uid = 0 ORDER BY ov.created DESC;

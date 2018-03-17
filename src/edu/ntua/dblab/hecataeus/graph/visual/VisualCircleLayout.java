@@ -12,16 +12,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.TreeMap;
+import java.util.Random;
 
-import edu.ntua.dblab.hecataeus.HecataeusViewer;
+import clusters.EngineConstructs.Cluster;
 import edu.ntua.dblab.hecataeus.graph.evolution.EdgeType;
 import edu.ntua.dblab.hecataeus.graph.evolution.NodeCategory;
 import edu.ntua.dblab.hecataeus.graph.evolution.NodeType;
-import edu.ntua.dblab.hecataeus.graph.evolution.messages.TopologicalTravel;
 import edu.uci.ics.jung.algorithms.layout.AbstractLayout;
-import edu.uci.ics.jung.visualization.renderers.Renderer;
-import edu.uci.ics.jung.visualization.renderers.Renderer.VertexLabel;
 
 /**
  * @author eva
@@ -31,39 +28,30 @@ import edu.uci.ics.jung.visualization.renderers.Renderer.VertexLabel;
 public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 
 	protected VisualGraph graph;
-	
 	private List<VisualNode> nodes;
 	private List<VisualNode> queries = new ArrayList<VisualNode>();
 	private List<VisualNode> relations = new ArrayList<VisualNode>();
 	private List<VisualNode> views = new ArrayList<VisualNode>();
-	private static int b = 0;
-	protected static int c = 0,  a = 0, rCnt = 0;
+	private int singleQueriesCounter = 0;
 	protected List<String> files = new ArrayList<String>();
 	protected List<VisualNode> RQV = new ArrayList<VisualNode>();
-	protected static int clusterId = 0;
-	private double edgelenngthforGraph = 0;
+	private List<List<VisualNode>> groups = new ArrayList<List<VisualNode>>();
 
-	
+	/**
+	 * places nodes in lists with respect to their type
+	 */
 	public VisualCircleLayout(VisualGraph g) {
-		/**
-		 * places nodes in lists with respect to their type
-		 * 
-		 */
 		super(g);
 		this.graph = g;
-		
 		nodes = new ArrayList<VisualNode>((Collection<? extends VisualNode>) g.getVertices());
 		for(VisualNode v : nodes){
-			
 			if(v.getType().getCategory() == NodeCategory.MODULE ){
-				
-				List<VisualEdge> edges = new ArrayList<VisualEdge>(v._inEdges);
+				List<VisualEdge> edges = new ArrayList<VisualEdge>(v.getInEdges());
 				for(VisualEdge e : edges){
 					if(e.getType() == EdgeType.EDGE_TYPE_CONTAINS){
 						if(files.contains(e.getFromNode().getName())==false){
 							files.add(e.getFromNode().getName());
 						}
-						
 					}
 				}
 			}
@@ -71,7 +59,7 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 				getQueries().add(v);
 			}
 			else if(v.getType() == NodeType.NODE_TYPE_RELATION){
-				List<VisualEdge> edges = new ArrayList<VisualEdge>(v._inEdges);
+				List<VisualEdge> edges = new ArrayList<VisualEdge>(v.getInEdges());
 				for(VisualEdge e : edges){
 					if(e.getType() == EdgeType.EDGE_TYPE_USES){
 						if(getRelations().contains(v)==false){
@@ -84,8 +72,6 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 				getViews().add(v);
 			}
 		}
-		
-		
 		for(VisualNode r : getRelations()){
 			for(int i =0; i < r.getInEdges().size(); i++){
 				if(r.getInEdges().get(i).getType()== EdgeType.EDGE_TYPE_USES){
@@ -95,11 +81,9 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 				}
 			}
 		}
-
 		for(VisualNode q: getQueries()){
 			RQV.add(q);
 		}
-
 		for(VisualNode v:getViews()){
 			if(RQV.contains(v)==false){
 				RQV.add(v);
@@ -113,19 +97,18 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 	 * @return radius of the cicle for these nodes
 	 */
 	protected double getSmallRad(List<VisualNode> komboi){
-		if(komboi.size()==1){
-			return(Math.log(komboi.size()));
+		if(komboi.size()==1)
+		{
+			return(0);
 		}
-		else{
-			return(Math.log(Math.pow(komboi.size(),3))+2*komboi.size());
-		}
+		return(8 * (Math.log(komboi.size()) + komboi.size()));
 	}
+	
 	protected double getQueryRad(int numOfNodes){
-		return(Math.log(numOfNodes*numOfNodes*numOfNodes)+2*numOfNodes);
+		return(2 * (Math.log(numOfNodes) + numOfNodes));
 	}
 	
 	/**
-	 * 
 	 * @param nodes
 	 * @return nodes that are of type relation
 	 */
@@ -137,25 +120,40 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 				relations.add(v);
 			}
 		}
-		
 		return relations;
 	}
+
 	/**
-	 * 
-	 * @param nodes
-	 * @return nodes that are of type query
+	 * @author pmanousi
+	 * @param nodes The nodes of the cluster
+	 * @return The queries that use more than one relations, or the queries that use views.
 	 */
-	protected ArrayList<VisualNode> queriesInCluster(List<VisualNode> nodes){
+	protected ArrayList<VisualNode> multiInputOrViewUsingQueriesInCluster(List<VisualNode> nodes)
+	{
 		ArrayList<VisualNode> queries = new ArrayList<VisualNode>();
-		for(VisualNode v : nodes){
-			if(v.getType() == NodeType.NODE_TYPE_QUERY){
-				queries.add(v);
+		for(VisualNode v : nodes)
+		{
+			if(v.getType() == NodeType.NODE_TYPE_QUERY)
+			{
+				if(v.getNumberOfUsesEdges() > 1)
+				{	// multiInput
+					queries.add(v);
+					continue;
+				}
+				for(VisualEdge e: v.getOutEdges())
+				{
+					if(e.getToNode().getType() == NodeType.NODE_TYPE_VIEW)
+					{	// view usage
+						queries.add(v);
+						break;
+					}
+				}
 			}
 		}
 		return queries;
 	}
+	
 	/**
-	 * 
 	 * @param nodes
 	 * @return nodes that are of type view
 	 */
@@ -206,83 +204,8 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 	protected void setViews(List<VisualNode> views) {
 		this.views = views;
 	}
-
-	/**
-	 * places nodes in a cluster
-	 * @param number of nodes in cluster
-	 * @param cx center x of the cluster
-	 * @param cy centet y of the cluster
-	 * @param clusterList the list to add this cluster
-	 * {@singleQinCl} : number of queries in cluster that referance only one relation
-	 * @variable set : map with fequently accessed relations
-	 * @variable Vset : map with fequently accessed views
-	 */
-	protected void circles(List<VisualNode> nodes, double cx, double cy, VisualTotalClusters clusterList){
-        ArrayList<VisualNode> rc = new ArrayList<VisualNode>();
-        ArrayList<VisualNode> qc = new ArrayList<VisualNode>();
-        ArrayList<VisualNode> vc = new ArrayList<VisualNode>();
-
-        rc.addAll(relationsInCluster(nodes));
-        qc.addAll(queriesInCluster(nodes));
-        vc.addAll(viewsInCluster(nodes));
-        
-        int singleQinCl = nodes.size() - rc.size() - outQ(nodes).size() - vc.size() - queriesWithViews(qc).size();
-        Map<ArrayList<VisualNode>, Integer> set = new HashMap<ArrayList<VisualNode>, Integer>(getRSimilarity(qc));
-        Map<ArrayList<VisualNode>, Integer> Vset = new HashMap<ArrayList<VisualNode>, Integer>(getVSimilarity(vc));
-        if(relationsInCluster(nodes).size()>3){
-        	Map<ArrayList<VisualNode>, Integer> sorted = sortByComparator(set);
-        	Map<ArrayList<VisualNode>, Integer> Vsorted = sortByComparator(Vset);
-            ArrayList<VisualNode> sortedR = new ArrayList<VisualNode>(getSortedArray(sorted, rc));
-            ArrayList<VisualNode> sortedV = new ArrayList<VisualNode>(getSortedArray(Vsorted, vc));
-            rc.clear();vc.clear();
-            rc.addAll(sortedR);vc.addAll(sortedV);
-        }
- 
-        double relationRad = 1.9*getSmallRad(rc);
-
-        double qRad = getQueryRad(nodes.size() - rc.size()- vc.size());
-        int Q = singleQinCl;
-        double qAngle = 0;
-        double sAngle = 0;
-        double newAngle = 2*Math.PI/rc.size();
-        ArrayList<VisualNode> multyV = new ArrayList<VisualNode>(vc);//getmultyViews
-        double viewBand = getViewBandSize(multyV, relationRad);
-        if(qRad <= viewBand){
-        	qRad = viewBand+40;
-        }
-        if(qRad <= relationRad){
-        	qRad = relationRad+40;
-        }
-                
-        if(rc.isEmpty()){
-        	placeQueries(qc, cx, cy, qRad, qc.size());
-        	placeRelations(vc, cx, cy);
-        }else{
-	        for(VisualNode r : rc){
-	        	
-	        	ArrayList<VisualNode> queriesforR = new ArrayList<VisualNode>(getQueriesforR(r));
-				if(queriesforR.isEmpty()){
-					placeRelation(r, qAngle, 0, relationRad, cx, cy, newAngle);
-				}else{
-					qAngle = placeQueries(queriesforR, cx, cy, qRad, Q);
-		        	sAngle += qAngle;
-		        	placeRelation(r, qAngle, sAngle, relationRad, cx, cy, newAngle);
-				}
-	        }
-	        placeOutQueries(nodes, qRad, cx, cy);
-	        placeQueriesWithViews(qc, cx, cy, qRad);
-	        placeMultyViews(multyV, cx, cy, relationRad+10);
-        }
-		clusterId++;
-		VisualCluster cluster = new VisualCluster(qRad, rc, vc, qc, cx, cy, clusterId);
-		
-		clusterList.addCluster(cluster);
-		cluster.printInClusterEdges();
-		edgelenngthforGraph += cluster.getLineLength();
-	}
 	
 	/**
-	 * 
 	 * @param unsortedMap
 	 * @return sorted map by value
 	 */
@@ -301,395 +224,357 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 		}
 		return sortedMap;
 	}
-	
-	
-	/**
-	 * place queries that reference only one spesific relation in their circle
-	 * @param queriesforR queries that reference only one relation
-	 * @param cx center x of cluster
-	 * @param cy center y o cluster
-	 * @param qRad radius for query circle
-	 * @param Q number of queries to be placed
-	 * @return the angle that this group of queries was placed
-	 */
-	protected double placeQueries(ArrayList<VisualNode> queriesforR,  double cx, double cy, double qRad, int Q) {
-		
-		double sAngle = 0.0;
-		double Angle = ((2 * Math.PI ) / Q);  
-		for(VisualNode q : queriesforR){			
-			Point2D coord = transform(q);
-			sAngle+=Angle;
-			coord.setLocation(Math.cos(Angle*a)*qRad+cx, Math.sin(Angle*a)*qRad+cy);
-			q.setLocation(coord);
-			q.setNodeAngle(Angle*a);
-			a++;
-		}
-		return sAngle;
-	}
-	/**
-	 * finds quries that only use views
-	 * @param queriesInCluster all nodes of type query in cluster
-	 * @return a list with these queries
-	 */
-	protected ArrayList<VisualNode> queriesWithViews(ArrayList<VisualNode> queriesInCluster){
-		ArrayList<VisualNode> myQ = new ArrayList<VisualNode>();
-		for(VisualNode v : queriesInCluster){
-			ArrayList<VisualEdge> mye = new ArrayList<VisualEdge>(v.getOutEdges());
-			boolean cnt = false;
-			for(VisualEdge m: mye){
-				if(m.getToNode().getType()== NodeType.NODE_TYPE_RELATION){
-					cnt=true;
-					break;
-				}
-			}
-			if(!cnt){
-				myQ.add(v);
-			}
-		}
-		return myQ;
-	}
-	/**
-	 * places queries that only use views in their circle
-	 * @param queriesInCluster query nodes in cluster
-	 * @param cx center x of cluster 
-	 * @param cy center y of cluster
-	 * @param myRad radius of this circle
-	 */
-	protected void placeQueriesWithViews(ArrayList<VisualNode> queriesInCluster, double cx, double cy, double myRad){
-		myRad = myRad + 80;
-		ArrayList<VisualNode> myQ = new ArrayList<VisualNode>();
-		for(VisualNode v : queriesInCluster){
-			ArrayList<VisualEdge> mye = new ArrayList<VisualEdge>(v.getOutEdges());
-			boolean cnt = false;
-			for(VisualEdge m: mye){
-				if(m.getToNode().getType()== NodeType.NODE_TYPE_RELATION){
-					cnt=true;
-					break;
-				}
-			}
-			if(!cnt){
-				myQ.add(v);
-			}
-		}
-		int e = 0;
-		double Angle = 2*Math.PI/myQ.size();
-		for(VisualNode n : myQ){
-			Point2D coord = transform(n);
-			coord.setLocation(Math.cos(Angle*e)*myRad+cx, Math.sin(Angle*e)*myRad+cy);
-	
-			n.setLocation(coord);
-			n.setNodeAngle(Angle*e);
-			e++;
-		}
-		
-	}
-	
-	/**
-	 * place single views
-	 * @param viewsforR 
-	 * @param cx
-	 * @param cy
-	 * @param qRad
-	 * @param Q
-	 */
-	protected double placeSingleViews(ArrayList<VisualNode> viewsforR,  double cx, double cy, double qRad, int Q) {
-		
-		double sAngle = 0.0;
-		double Angle = ((2 * Math.PI ) / Q);   //+qAngle;
-		for(VisualNode q : viewsforR){
-						
-			Point2D coord = transform(q);
-			sAngle+=Angle;
-			coord.setLocation(Math.cos(Angle*b)*qRad+cx, Math.sin(Angle*b)*qRad+cy);
 
-			q.setLocation(coord);
-			q.setNodeAngle(Angle*b);
-			b++;
-		}
-		
-		return sAngle;
-		
-	}
 	/**
-	 * places the band of views
-	 * @param viewsInCluster
-	 * @return
+	 * Places the nodes to:
+	 * a) A circle that contains the queries of the cluster, that use only one relation
+	 * b) A circle that has the relations of the cluster, based on the placement of the single relation queries
+	 * c) A circular disc that has the views that use the relations of the cluster, this disk is between the relations and the single relation queries
+	 * d) A circle made of "cloud" like points that has the queries that use either (i) views or (ii) more than one relations
+	 * @author pmanousi
+	 * @param nodes The nodes of a cluster
+	 * @param clusterCenter The center of the cluster circle
 	 */
-	protected ArrayList<VisualNode> getMultipleRViews(ArrayList<VisualNode> viewsInCluster){
-		ArrayList<VisualNode> multyViews = new ArrayList<VisualNode>();
-		
-		for(VisualNode v : viewsInCluster){
-			int cnt = 0;
-			ArrayList<VisualEdge> edges = new ArrayList<VisualEdge>(v.getOutEdges());
-			for(VisualEdge e : edges){
-				if(e.getToNode().getType() == NodeType.NODE_TYPE_VIEW){
-					multyViews.add(v);
-				}
-				else if(e.getToNode().getType() == NodeType.NODE_TYPE_RELATION){
-					cnt++;
-				}
+	protected void circles(List<VisualNode> nodes, Point2D clusterCenter){
+		relations.clear();
+		views.clear();
+		queries.clear();
+		groups.clear();
+        ArrayList<VisualNode> singleRelationQueries = new ArrayList<VisualNode>();
+        relations.addAll(relationsInCluster(nodes));
+        for(VisualNode relation: relations)
+        {
+        	singleRelationQueries.addAll(getSingleTableQueriesOfRelation(relation));
+        }
+        queries.addAll(multiInputOrViewUsingQueriesInCluster(nodes));
+        views.addAll(viewsInCluster(nodes));
+        Map<ArrayList<VisualNode>, Integer> set = new HashMap<ArrayList<VisualNode>, Integer>(getRSimilarity(queries));
+        Map<ArrayList<VisualNode>, Integer> Vset = new HashMap<ArrayList<VisualNode>, Integer>(getVSimilarity(views));
+        if(relationsInCluster(nodes).size()>3)
+        {
+        	Map<ArrayList<VisualNode>, Integer> sorted = sortByComparator(set);
+        	Map<ArrayList<VisualNode>, Integer> Vsorted = sortByComparator(Vset);
+            ArrayList<VisualNode> sortedR = new ArrayList<VisualNode>(getSortedArray(sorted, relations));
+            ArrayList<VisualNode> sortedV = new ArrayList<VisualNode>(getSortedArray(Vsorted, views));
+            relations.clear();
+            views.clear();
+            relations.addAll(sortedR);
+            views.addAll(sortedV);
+        }
+        double relationRad = getSmallRad(relations);
+        double singleRelationQueriesRad = getQueryRad(singleRelationQueries.size());
+        double maxViewRad = getMaxViewRadius(views, relationRad);
+        if(singleRelationQueriesRad < maxViewRad + (relationRad * 0.5)){
+        	singleRelationQueriesRad = maxViewRad + (relationRad * 0.5);
+        }
+        if(singleRelationQueriesRad < relationRad * 2){
+        	singleRelationQueriesRad = relationRad * 2;
+        }
+        double relationAngle = 0;
+        for(VisualNode r : relations)
+        {
+			if(getSingleTableQueriesOfRelation(r).size() > 0)
+			{
+				placeQueries(getSingleTableQueriesOfRelation(r), clusterCenter, singleRelationQueriesRad, singleRelationQueries.size());
+				relationAngle = (getSingleTableQueriesOfRelation(r).get(getSingleTableQueriesOfRelation(r).size()-1).getNodeAngle() + getSingleTableQueriesOfRelation(r).get(0).getNodeAngle()) / 2.0;	// Barycentered placement of the relation node, based on the single table queries.
 			}
-			if(cnt > 1){
-				multyViews.add(v);
-			}
-		}
-		return multyViews;
+        	placeRelation(r, relationAngle, relationRad, clusterCenter, getSingleTableQueriesOfRelation(r).size());
+        }
+        if(views.size() > 0)
+        {
+        	placeMultyViews(views, relationRad, clusterCenter);
+        }
+        if(queries.size() > 0)
+        {
+        	placeOutQueries(queries, singleRelationQueriesRad, clusterCenter);
+        }
 	}
 	
-	protected Map<Double, VisualNode> sortViewsById(ArrayList<VisualNode> mv){
-		TreeMap<Double, VisualNode> idViews = new TreeMap<Double, VisualNode>();
-		for(VisualNode v : mv){
-			idViews.put(v.ID,v);
-		}
-		Map<Double, VisualNode>  ReverseOrderedMap = new TreeMap<Double, VisualNode>(idViews);
-		return ReverseOrderedMap;
-	}
-	
-	protected Map<Double, VisualNode> viewRad(Map<Double, VisualNode> viewsId, double startRad){
-		double cnt = startRad*2;
-		Map<Double, VisualNode>  myMap = new TreeMap<Double, VisualNode>();
-		
-		for(Map.Entry<Double, VisualNode> entry : viewsId.entrySet()){
-			myMap.put(cnt, entry.getValue());
-			cnt-=10;
-		}
-		
-		return myMap;
-	}
-	protected double getViewBandSize(ArrayList<VisualNode> mv, double relRad){
-		if(mv.size()<1){
-			return 0;
-		}else{
-			TreeMap<Double, ArrayList<VisualNode>> myViews = new TreeMap<Double, ArrayList<VisualNode>>();
-			TopologicalTravel tt = new TopologicalTravel(graph);
-			//tt.travelLevel();
-			myViews = tt.travelLevel();
-
-			double size = myViews.lastKey();
-			return relRad/3*size+relRad*1.25;
-		}
-	}
-	
-	
-	protected void placeMultyViews(ArrayList<VisualNode> mv, double cx, double cy , double l0Rad){
-//		TreeMap<Double, VisualNode> myViews = new TreeMap<Double, VisualNode>(sortViewsById(mv));
-		TreeMap<Double, ArrayList<VisualNode>>  myV = new TreeMap<Double, ArrayList<VisualNode>> ();
-		
-		if(mv.size()>1){
-			TopologicalTravel tt = new TopologicalTravel(graph);
-			//tt.travelLevel();
-			myV = tt.travelLevel();
-		}
-		
-		
-		double Angle = ((2 * Math.PI ) / mv.size());   //+qAngle;
+	/**
+	 * @param views
+	 * @param clusterCenter
+	 * @param l0Rad
+	 */
+	protected void placeMultyViews(List<VisualNode> views, double l0Rad, Point2D clusterCenter)
+	{
+		List<Point2D> usedPoints = new ArrayList<Point2D>();
+		TopologicalTravel tt = new TopologicalTravel(graph);
 		double vRad;
-		for(Map.Entry<Double, ArrayList<VisualNode>> entry : myV.entrySet()){
-			for( VisualNode viewN :entry.getValue()){
-				
-			
-			//System.out.println(entry.getKey() + "/" + entry.getValue());
-			vRad = entry.getKey()*l0Rad/3+l0Rad*1.25;
-
-			//System.out.println("VRAD  " + vRad);
-			Point2D coord = transform(viewN);
-			coord.setLocation(Math.cos(Angle*c)*vRad+cx, Math.sin(Angle*c)*vRad+cy);
-
-			viewN.setLocation(coord);
-			viewN.setNodeAngle(Angle*c);
-			c++;
-			}
-		}
-	}
-	//place views
-	protected void placeViews(ArrayList<VisualNode> vc, double relationRad, double queryRad, double cx, double cy){
-		double viewRad = (queryRad + relationRad)/2;
-		double angle = (2*Math.PI)/vc.size();
-		int va =0;
-		double myAngle = 0;
-		double d = 0.0;
-		for(VisualNode v : vc){
-			ArrayList<VisualNode> myQ = new ArrayList<VisualNode>(getMyQueries(v));
-			if(myQ.size()>1){
-				for(VisualNode mq : myQ){
-					myAngle += mq.getNodeAngle();
-				}
-				myAngle = myAngle/2 + d;
-				d+=0.09;
-			}
-			else{
-				myAngle = angle*va;
-			}
-			Point2D coord = transform(v);
-			//coord.setLocation((Math.cos(angle*va)*viewRad + cx), (Math.sin(angle*va)*viewRad + cy));
-			coord.setLocation((Math.cos(myAngle)*viewRad + cx), (Math.sin(myAngle)*viewRad + cy));
-			v.setLocation(coord);
-			v.setNodeAngle(myAngle);
-			va++;
-		}
-		
-	}
-	
-	
-	
-	
-	protected ArrayList<VisualNode> getMyQueries(VisualNode v){
-		ArrayList<VisualNode> q = new ArrayList<VisualNode>();
-		
-		ArrayList<VisualEdge> edges = new ArrayList<VisualEdge>(v.getOutEdges());
-		for(VisualEdge e : edges){
-			if(e.getToNode().getType() == NodeType.NODE_TYPE_QUERY){
-				q.add(e.getToNode());
-			}
-		}
-		
-		return q;
-	}
-
-	/**
-	 * posa q rotane panw apo mia r
-	 * @param nodes
-	 * @return
-	 */
-	protected ArrayList<VisualNode> outQ(List<VisualNode> nodes){
-		ArrayList<VisualNode> q = new ArrayList<VisualNode>();
-		for(VisualNode v : nodes){
-			if(v.getType() == NodeType.NODE_TYPE_QUERY){
-				int cnt = 0;
-				List<VisualEdge> edges = new ArrayList<VisualEdge>(v.getOutEdges());
-				for(VisualEdge e : edges){
-					if(e.getToNode().getType() == NodeType.NODE_TYPE_RELATION){
-						cnt++;
-						if(cnt > 1){
-							if(!q.contains(v)){
-								q.add(v);
-							}
-						}
+		for(Entry<Integer, List<VisualNode>> entry : tt.viewStratificationLevels().entrySet())
+		{
+			for(VisualNode stratifiedView : entry.getValue())
+			{
+				double angle = 0;
+				int angleCounter = 0;
+				for(VisualEdge e : stratifiedView.getOutEdges())
+				{
+					if(e.getToNode().getType().getCategory() == NodeCategory.MODULE)
+					{
+						angle += e.getToNode().getNodeAngle();
+						angleCounter++;
 					}
 				}
+				angle /= angleCounter;
+				vRad = (entry.getKey() + 1.5) * l0Rad ;
+				Point2D coord = transform(stratifiedView);
+				coord.setLocation(Math.cos(angle)*vRad+clusterCenter.getX(), Math.sin(angle)*vRad+clusterCenter.getY());
+				while(usedPoints.contains(coord) == true)
+				{	// here I should change sth a little bit.
+					coord.setLocation(addSomeNoise(coord, vRad*0.2));	// this should get some random X and Y modification
+				}
+				usedPoints.add(coord);
+				stratifiedView.setLocation(coord);
+				stratifiedView.setNodeAngle(angle);
 			}
 		}
-		//queriesInCluster = q.size();
-		return q;
 	}
-	
-	protected ArrayList<VisualNode> getSortedArray(Map<ArrayList<VisualNode>, Integer> sorted, ArrayList<VisualNode>rc){
+
+	/**
+	 * Places the single table queries to a circle. This circle is guiding the placement of the relations in a later step.
+	 * @author pmanousi
+	 * @param queriesForThisRelation The queries that refer only to a specific relation (single table queries) in this cluster 
+	 * @param clusterCenter The center of the cluster that these queries are part of
+	 * @param qRad The radius of the single table queries circle in this cluster
+	 * @param numberOfSingleRelationQueriesInTheCluster The number of single table queries of the whole cluster 
+	 */
+	protected void placeQueries(ArrayList<VisualNode> queriesForThisRelation,  Point2D clusterCenter, double qRad, int numberOfSingleRelationQueriesInTheCluster)
+	{
+		if(numberOfSingleRelationQueriesInTheCluster != 0)
+		{
+			double Angle = ((2 * Math.PI ) / numberOfSingleRelationQueriesInTheCluster);  
+			for(VisualNode q : queriesForThisRelation)
+			{
+				Point2D coord = transform(q);
+				coord.setLocation(Math.cos(Angle*singleQueriesCounter)*qRad+clusterCenter.getX(), Math.sin(Angle*singleQueriesCounter)*qRad+clusterCenter.getY());
+				q.setLocation(coord);
+				q.setNodeAngle(Angle*singleQueriesCounter);
+				singleQueriesCounter++;
+			}
+		}
+	}
+
+	/**
+	 * Places a relation to the internal circle of the relations, in a cluster. If the relation has no single table queries, then it is placed a little bit (20%) more towards the center of the cluster. 
+	 * @author pmanousi
+	 * @param relation The relation to be placed
+	 * @param relationAnglePossition The angle that this relation has from the center of the cluster
+	 * @param relationRad The radius of the relation circle in this cluster
+	 * @param clusterCenter The center of the cluster that this relation is part of
+	 * @param numberOfQueriesOnlyForThisRelation The number queries that refer to only this relation (single table queries) in order to modify the radius
+	 */
+	protected void placeRelation(VisualNode relation, double relationAnglePossition, double relationRad, Point2D clusterCenter, int numberOfQueriesOnlyForThisRelation)
+	{
+		Point2D coord = transform(relation);
+		if(numberOfQueriesOnlyForThisRelation != 0)
+		{
+			coord.setLocation(Math.cos(relationAnglePossition)*relationRad+clusterCenter.getX(), Math.sin(relationAnglePossition)*relationRad+clusterCenter.getY());
+		}
+		else
+		{
+			coord.setLocation(Math.cos(relationAnglePossition)*relationRad*0.8+clusterCenter.getX(), Math.sin(relationAnglePossition)*relationRad*0.8+clusterCenter.getY());
+		}
+		relation.setLocation(coord);
+		relation.setNodeAngle(relationAnglePossition);
+	}
+
+	protected double getMaxViewRadius(List<VisualNode> mv, double relRad)
+	{
+		if(mv.size()>1)
+		{
+			TopologicalTravel tt = new TopologicalTravel(graph);
+			return(relRad * (tt.viewStratificationLevels().lastKey() + 1.5));
+		}
+		return(0);
+	}
+
+	protected ArrayList<VisualNode> getSortedArray(Map<ArrayList<VisualNode>, Integer> sorted, List<VisualNode> relations2){
 		ArrayList<VisualNode> sortedR = new ArrayList<VisualNode>();
-		for(Entry e : sorted.entrySet()){
-		//	System.out.println("print  " + e.getValue()+"   " +e.getKey());
-			ArrayList<VisualNode> temp = ((ArrayList<VisualNode>)e.getKey());
-			for(VisualNode node : temp){
-				if(!sortedR.contains(node)){
+		for(Entry<ArrayList<VisualNode>, Integer> e : sorted.entrySet())
+		{
+			for(VisualNode node : e.getKey())
+			{
+				if(!sortedR.contains(node))
+				{
 					sortedR.add(node);
 				}
 			}
 		}
-		for(VisualNode node1 : rc){
-			if(!sortedR.contains(node1)){
+		for(VisualNode node1 : relations2)
+		{
+			if(!sortedR.contains(node1))
+			{
 				sortedR.add(node1);
 			}
 		}
-		
 		return sortedR;
 	}
 	
-	protected ArrayList<VisualNode>getQueriesforR(VisualNode relationNode){
+	/**
+	 * Gives the queries that ask only one table, the relationNode table.
+	 * @author pmanousi
+	 * @param relationNode The relation whose the single table queries we are searching  
+	 * @return The queries that use only the relationNode relation
+	 */
+	protected ArrayList<VisualNode>getSingleTableQueriesOfRelation(VisualNode relationNode)
+	{
 		ArrayList<VisualNode> queriesforR = new ArrayList<VisualNode>();
-		for(VisualEdge e : relationNode.getInEdges()){
-            if(e.getFromNode().getType() == NodeType.NODE_TYPE_QUERY ){
-                    VisualNode q = e.getFromNode();
-                    ArrayList<VisualEdge> qEdges = new ArrayList<VisualEdge>(q.getOutEdges());
-                    int cnt = 0;
-                    for(VisualEdge ed : qEdges){
-                            if(ed.getToNode().getType() == NodeType.NODE_TYPE_RELATION){
-                                    cnt++;
-                            }
-                    }
-                    if(cnt==1){
-                            queriesforR.add(q);
-                    }
-                    
+		for(VisualEdge e : relationNode.getInEdges())
+		{
+            if(e.getFromNode().getType() == NodeType.NODE_TYPE_QUERY && e.getFromNode().getNumberOfUsesEdges() == 1)
+            {
+                queriesforR.add(e.getFromNode());
             }
 		}
 		return queriesforR;
 	}
-	//single relation views
-	//layer 0
-	protected ArrayList<VisualNode>getViewsforR(VisualNode relationNode){
-		ArrayList<VisualNode> viewsforR = new ArrayList<VisualNode>();
-		
-		for(VisualEdge e : relationNode.getInEdges()){
-			if(e.getFromNode().getType() == NodeType.NODE_TYPE_QUERY ){
-				VisualNode q = e.getFromNode();
-				ArrayList<VisualEdge> qEdges = new ArrayList<VisualEdge>(q.getOutEdges());
-				int cnt = 0;
-				for(VisualEdge ed : qEdges){
-					if(ed.getToNode().getType() == NodeType.NODE_TYPE_RELATION){
-						cnt++;
+
+	/**
+	 * Places the queries that use more than one relations, or they use a view. We have created groups of the queries that ask the same relations/views, and we place them in a "cloud" like area in this outer circle. 
+	 * @author pmanousi
+	 * @param nodes The queries that use more than one relations (or they use a view)
+	 * @param qRad The radius of the single table queries
+	 * @param clusterCenter The center of the cluster that these queries are part of
+	 */
+	protected void placeOutQueries(List<VisualNode> nodes, double qRad, Point2D clusterCenter)
+	{
+		List<Point2D> usedCoordinates = new ArrayList<Point2D>();
+		double jqRad = qRad * 1.4;
+		for(VisualNode v : queries)
+		{
+			double myAngle = 0.0;
+			int numberOfRelationsForThisQuery = 0;
+			for(VisualEdge myEdge : v.getOutEdges())
+			{
+				if(myEdge.getToNode().getType() == NodeType.NODE_TYPE_RELATION || myEdge.getToNode().getType() == NodeType.NODE_TYPE_VIEW)
+				{
+					myAngle += myEdge.getToNode().getNodeAngle();
+					numberOfRelationsForThisQuery++;
+				}
+			}
+			myAngle /= numberOfRelationsForThisQuery;
+			Point2D coord = transform(v);
+			coord.setLocation(Math.cos(myAngle)*jqRad+clusterCenter.getX(), Math.sin(myAngle)*jqRad+clusterCenter.getY());
+			double counter = jqRad / 33.0;
+			while(usedCoordinates.contains(coord) == true)
+			{
+				coord.setLocation(Math.cos(myAngle)*(jqRad+counter)+clusterCenter.getX(), Math.sin(myAngle)*(jqRad+counter)+clusterCenter.getY());
+				counter += jqRad / 33.0;
+			}
+			v.setLocation(coord);
+			usedCoordinates.add(v.getLocation());
+			v.setNodeAngle(myAngle);
+			boolean createGroupForThisNode = true;
+			for(List<VisualNode> vnl: groups)
+			{
+				if(vnl != null && vnl.get(vnl.size()-1).getNodeAngle() == v.getNodeAngle())
+				{	// already heaving a group for this angle 
+					vnl.add(v);
+					createGroupForThisNode = false;
+					break;
+				}
+			}
+			if(createGroupForThisNode)
+			{	// we didn't have any group for this angle, so we create one
+				List<VisualNode> group = new ArrayList<VisualNode>();
+				group.add(v);
+				groups.add(group);
+			}
+		}
+		boolean finished = false;
+		while(finished == false)
+		{	// while new groups are created and have not been checked
+			finished = true;
+			List<VisualNode> newGroup = new ArrayList<VisualNode>();
+			for(List<VisualNode> vnl: groups)
+			{	// I am not sure if I should check only the last of the groups but never mind
+				VisualNode firstNodeOfGroup = vnl.get(0);
+				for(VisualNode v : vnl)
+				{
+					if(theyHaveSameProviders(v, firstNodeOfGroup) == false)
+					{
+						newGroup.add(v);
+						continue;
 					}
 				}
-				if(cnt==1){
-					viewsforR.add(q);
-				}
+				vnl.removeAll(newGroup);
+			}
+			if(newGroup.size()>0)
+			{
+				finished = false;
+				groups.add(newGroup);
 			}
 		}
-		return viewsforR;
-	}
-	
-	protected void placeRelation(VisualNode r, double qAngle, double sAngle, double relationRad, double cx, double cy, double newAngle){
-		Point2D coord = transform(r);
-		double rx = 0;
-		double ry = 0;
-		
-		rx = Math.cos(sAngle-(qAngle/2))*relationRad+(cx);
-		ry = Math.sin(sAngle-(qAngle/2))*relationRad+(cy);
-		rCnt++;
-		coord.setLocation(rx, ry);
-		r.setLocation(coord);
-		r.setNodeAngle(sAngle-(qAngle/2));
-	}
-	
-	
-	protected void placeOutQueries(List<VisualNode> nodes, double qRad, double cx, double cy){
-		double jqRad = qRad + 40;
-		ArrayList<VisualNode>  allR = new ArrayList<VisualNode>();
-		for(VisualNode v : outQ(nodes)){
-			double c = 0;
-			ArrayList<VisualNode> myR = new ArrayList<VisualNode>();
-			for(VisualEdge myEdge : v.getOutEdges()){
-				if(myEdge.getToNode().getType() == NodeType.NODE_TYPE_RELATION){
-					myR.add(myEdge.getToNode());
-					allR.add(myEdge.getToNode());
-				}
+		double groupsAngle = 2 * Math.PI / groups.size();
+		int counter = 0;
+		for(List<VisualNode> vnl : groups)
+		{
+			Point2D groupPosition = new Point2D.Double(Math.cos(groupsAngle * counter) * jqRad + clusterCenter.getX(), Math.sin(groupsAngle * counter) * jqRad + clusterCenter.getY());
+			for(VisualNode v : vnl)
+			{	// place them in a "cloud"
+				Point2D coord = transform(v);
+				coord.setLocation(addSomeNoise(groupPosition, qRad*0.2));	// this should get some random X and Y modification
+				v.setLocation(coord);
+				v.setNodeAngle(groupsAngle * counter);	// this is unneeded
 			}
-			int cnt = 0;
-			double myAngle = 0.0;
-			for(VisualNode rel : myR){
-				myAngle += rel.getNodeAngle();
-				cnt++;
-			}
-			if(myAngle<2*Math.PI){
-				myAngle = myAngle/cnt + c;
-			}
-			else{
-				myAngle = myAngle + c;
-			}
-			
-			c += 0.09;
-			Point2D coord = transform(v);
-			double jqx = Math.cos(myAngle)*jqRad+(cx);
-			double jqy = Math.sin(myAngle)*jqRad+(cy);
-			coord.setLocation(jqx, jqy);
-
-			v.setLocation(coord);
-			v.setNodeAngle(myAngle);
+			counter++;
 		}
 	}
 	
-	protected Map<ArrayList<VisualNode>, Integer> getRSimilarity(ArrayList<VisualNode> qc){
+	/**
+	 * Adds some "noise" to the current possition of a node (in order to create a "cloud" for the nodes.
+	 * @author pmanousi
+	 * @param currentPossition The possition that this node has up to now
+	 * @param spreadFactor A radius saying how far the node should be placed (now I have it to 20% of the radius of the single table queries
+	 * @return The new possition for this node
+	 */
+	private Point2D addSomeNoise(Point2D currentPossition, Double spreadFactor)
+	{
+		Point2D toReturn = new Point2D.Double();
+		Random randomGenerator = new Random();
+		toReturn.setLocation(currentPossition.getX() + (spreadFactor) * randomGenerator.nextDouble() - spreadFactor / 2, currentPossition.getY() + (spreadFactor) * randomGenerator.nextDouble() - spreadFactor / 2);
+		return toReturn;
+	}
+	
+	/**
+	 * Takes two nodes and searches if they have the same providers (relations or views or other queries -nested-).
+	 * @author pmanousi
+	 * @param v The node that we want to see if it has the same providers with the first one in the list of its group.
+	 * @param fvn The first node in the list of its group.
+	 * @return True if the two nodes have the exast same providers or falst otherwise.
+	 */
+	private boolean theyHaveSameProviders(VisualNode v, VisualNode fvn)
+	{
+		if(v == fvn)
+		{
+			return(true);
+		}
+		int howManyTimesToFindTrue = 0;
+		if(v.getNumberOfUsesEdges() != fvn.getNumberOfUsesEdges())
+		{
+			return(false);
+		}
+		for(VisualEdge efvn : fvn.getOutEdges())
+		{
+			for(VisualEdge ev : v.getOutEdges())
+			{
+				if(ev.getToNode() == efvn.getToNode())
+				{
+					howManyTimesToFindTrue++;
+					continue;
+				}
+			}
+		}
+		if(howManyTimesToFindTrue == v.getNumberOfUsesEdges())
+		{
+			return(true);
+		}
+		return(false);
+	}
+	
+	protected Map<ArrayList<VisualNode>, Integer> getRSimilarity(List<VisualNode> queries2){
 		Map<ArrayList<VisualNode>, Integer> set = new HashMap<ArrayList<VisualNode>, Integer>();
 		
-		for(VisualNode q : qc){
+		for(VisualNode q : queries2){
 			ArrayList<VisualEdge> qEdges = new ArrayList<VisualEdge>(q.getOutEdges());
 			int toRelation = 0;
 			for(VisualEdge ed : qEdges){
@@ -714,10 +599,49 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 		return set;
 	}
 	
-	protected Map<ArrayList<VisualNode>, Integer> getVSimilarity(ArrayList<VisualNode> vc){
+	protected double getMaxRadius(List<VisualNode> nodes)
+	{
+		relations.clear();
+		views.clear();
+		queries.clear();
+		groups.clear();
+        ArrayList<VisualNode> singleRelationQueries = new ArrayList<VisualNode>();
+        relations.addAll(relationsInCluster(nodes));
+        for(VisualNode relation: relations)
+        {
+        	singleRelationQueries.addAll(getSingleTableQueriesOfRelation(relation));
+        }
+        queries.addAll(multiInputOrViewUsingQueriesInCluster(nodes));
+        views.addAll(viewsInCluster(nodes));
+        Map<ArrayList<VisualNode>, Integer> set = new HashMap<ArrayList<VisualNode>, Integer>(getRSimilarity(queries));
+        Map<ArrayList<VisualNode>, Integer> Vset = new HashMap<ArrayList<VisualNode>, Integer>(getVSimilarity(views));
+        if(relationsInCluster(nodes).size()>3)
+        {
+        	Map<ArrayList<VisualNode>, Integer> sorted = sortByComparator(set);
+        	Map<ArrayList<VisualNode>, Integer> Vsorted = sortByComparator(Vset);
+            ArrayList<VisualNode> sortedR = new ArrayList<VisualNode>(getSortedArray(sorted, relations));
+            ArrayList<VisualNode> sortedV = new ArrayList<VisualNode>(getSortedArray(Vsorted, views));
+            relations.clear();
+            views.clear();
+            relations.addAll(sortedR);
+            views.addAll(sortedV);
+        }
+        double relationRad = getSmallRad(relations);
+        double singleRelationQueriesRad = getQueryRad(singleRelationQueries.size());
+        double maxViewRad = getMaxViewRadius(views, relationRad);
+        if(singleRelationQueriesRad < maxViewRad + (relationRad * 0.5)){
+        	singleRelationQueriesRad = maxViewRad + (relationRad * 0.5);
+        }
+        if(singleRelationQueriesRad < relationRad * 2){
+        	singleRelationQueriesRad = relationRad * 2;
+        }
+		return(singleRelationQueriesRad * 3);
+	}
+	
+	protected Map<ArrayList<VisualNode>, Integer> getVSimilarity(List<VisualNode> views2){
 		Map<ArrayList<VisualNode>, Integer> set = new HashMap<ArrayList<VisualNode>, Integer>();
 		
-		for(VisualNode v : vc){
+		for(VisualNode v : views2){
 			ArrayList<VisualEdge> vEdges = new ArrayList<VisualEdge>(v.getOutEdges());
 			int toRelation = 0;
 			for(VisualEdge ed : vEdges){
@@ -742,52 +666,27 @@ public class VisualCircleLayout extends AbstractLayout<VisualNode, VisualEdge>{
 		return set;
 	}
 	
-	protected void placeRelations(ArrayList<VisualNode>rc, double cx, double cy){
-		double smallRad = 1.3*getSmallRad(rc);
-		double angle = (2 * Math.PI ) / rc.size();
-		int cnt = 0;
-		for(VisualNode v : rc){
-			Point2D coord = transform(v);
-			coord.setLocation(Math.cos(angle*cnt)*smallRad+(cx),Math.sin(angle*cnt)*smallRad+(cy));
-			v.setLocation(coord);
-			v.setNodeAngle(angle*cnt);
-			cnt++;
-		}
-		
-	}
-	
-  protected void drawCircles(List<VisualNode> nodes, double cx, double cy){
-		int b = 0;
-		ArrayList<VisualNode> rc = new ArrayList<VisualNode>();
-		ArrayList<VisualNode> qc = new ArrayList<VisualNode>();
-		ArrayList<VisualNode> vc = new ArrayList<VisualNode>();
-		for(VisualNode v : nodes){
-			if(v.getType() == NodeType.NODE_TYPE_RELATION){
-				rc.add(v);
-				double smallRad = 1.3*getSmallRad(relationsInCluster(nodes));
-				Point2D coord = transform(v);
-				double angleA = (2 * Math.PI ) / relationsInCluster(nodes).size();
-				coord.setLocation(Math.cos(angleA*b)*smallRad+(cx),Math.sin(angleA*b)*smallRad+(cy));
-				v.setLocation(coord);
-			}else{
-				if(v.getType() == NodeType.NODE_TYPE_QUERY){
-					qc.add(v);
-				}
-				else if(v.getType() == NodeType.NODE_TYPE_VIEW){
-					vc.add(v);
-				}
-				double smallRad = getSmallRad(nodes);
-				Point2D coord = transform(v);
-				double angleA = 0.0;
-				if(relationsInCluster(nodes).size() > 1){
-					angleA = (2 * Math.PI ) / (nodes.size()-relationsInCluster(nodes).size());
-				}else{
-					angleA = (2 * Math.PI ) / nodes.size();
-				}
-				coord.setLocation(Math.cos(angleA*b)*smallRad+(cx),Math.sin(angleA*b)*smallRad+(cy));
-				v.setLocation(coord);
+	/**
+	 * Given a list of clusters, it sorts them, according their size, it creates small lists of 2^i segments and returns them to the caller function.
+	 * @author pmanousi
+	 * @param clusters The clusters of the graph.
+	 * @return A sorted list that contains 2^i clusters in its i list-node.
+	 */
+	protected ArrayList<ArrayList<Cluster>> createTwoToISegments(List<Cluster> clusters)
+	{
+		Collections.sort(clusters, new ClusterComparator());
+		ArrayList<ArrayList<Cluster>> listOfClusters = new ArrayList<ArrayList<Cluster>>();
+		int segmentCounter = 0;	// from now we will take 2^conCircle clusters
+		while(Math.pow(2, segmentCounter) < clusters.size())
+		{
+			double upperLimit = Math.pow(2, segmentCounter + 1);
+			if(upperLimit > clusters.size())
+			{
+				upperLimit = clusters.size() + 1;
 			}
-			b++;
+			listOfClusters.add(new ArrayList<Cluster>(clusters.subList((int) (Math.pow(2, segmentCounter) - 1) /* whatever^0 = 1, so I perform a slide to take 0 from list of clusters*/, (int) (upperLimit - 1))));	// sublist does not take the upper limit
+			segmentCounter++;
 		}
+		return(listOfClusters);
 	}
 }
