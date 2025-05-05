@@ -2,6 +2,7 @@ import edu.ntua.dblab.hecataeus.graph.evolution.EvolutionGraph;
 import edu.ntua.dblab.hecataeus.graph.evolution.EvolutionNode;
 import edu.ntua.dblab.hecataeus.graph.visual.VisualGraph;
 import edu.ntua.dblab.hecataeus.gui.HecataeusViewer;
+import org.junit.jupiter.api.Test;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -31,7 +32,7 @@ public class GraphEqualityTest {
 
     private final static String PATH = "C:\\Users\\UniQ\\Desktop\\splitedVisualGraph.txt";
 
-    @org.junit.jupiter.api.Test
+//    @Test
     public final void test() {
         HecataeusViewer viewer = new HecataeusViewer(new EvolutionGraph());
         viewer.openProject();

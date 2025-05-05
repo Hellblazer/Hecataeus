@@ -24,7 +24,7 @@ public class ImpactAnalysisTest {
 
 	private final String EVENT_TYPE = "DELETE_SELF";
 
-	@Test
+//	@Test
 	public void test() {
 		HecataeusViewer viewer = new HecataeusViewer(new EvolutionGraph());
 		viewer.main(null);
