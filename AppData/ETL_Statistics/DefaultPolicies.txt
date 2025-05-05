@@ -1,2 +1,0 @@
-DATABASE: ON Add_attribute TO View THEN PROPAGATE;
-ETL1_ACT10: ON Add_attribute TO ETL1_ACT10 THEN block;
